@@ -1,0 +1,191 @@
+﻿﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Minecraft 控制介面</title>
+</head>
+
+<body>
+    <main>
+        <status>
+            <input type="text" id="ws_ip" class="status_elements" placeholder="輸入 WebSocket 伺服器 IP" />
+
+            <button id="connect_btn" class="status_elements">連線</button>
+
+            <button onclick="toggleServer()" class="status_elements" id="power_button">啟動伺服器</button>
+
+            <div class="status_elements">
+                <strong>伺服器狀態：</strong><span id="server_status">未知</span>
+            </div>
+            <div class="status_elements">
+                <strong>在線人數：</strong><span id="online_player">未知</span>
+            </div>
+            <div class="status_elements">
+                <strong>玩家列表：</strong><span id="player_list">未知</span>
+            </div>
+        </status>
+        <log>
+            <pre id="log"></pre>
+        </log>
+
+        </div>
+
+        <script>
+
+            const WebSocket = window.WebSocket || window.MozWebSocket;
+
+            let ws = null;
+            const log = document.getElementById('log');
+            const powerButton = document.getElementById('power_button');
+
+
+            const connectBtn = document.getElementById('connect_btn');
+            const wsIpInput = document.getElementById('ws_ip');
+            var isServerOnline;
+
+            connectBtn.addEventListener('click', () => {
+                const ip = wsIpInput.value.trim();
+                if (!ip) {
+                    alert('請輸入伺服器 IP');
+                    return;
+                }
+                connectWebSocket(ip);
+            });
+
+
+            function connectWebSocket(ip) {
+                if (!WebSocket) {
+                    log.textContent = '您的瀏覽器不支援 WebSocket';
+                    return;
+                }
+
+                if (ws) {
+                    ws.close();  // 如果已有連線，先關閉
+                }
+
+                const url = `ws://${ip}:8765`;  // 假設固定端口8765，若可變可改成輸入框
+                log.textContent = `嘗試連線到 ${url}...`;
+
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    log.textContent += '\nWebSocket 已連線';
+                    console.log('WebSocket 已連線到 Python 伺服器');
+                    sendCommand("status")
+                };
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    try {
+                        if (data.cmd == "log") {
+                            log.textContent += '\n' + data.content;
+                            return;
+                        }
+
+                        if (data.cmd == "status") {
+                            if (data.online) {
+                                // log.textContent += '\n已取得伺服器狀態: 在線';
+                                isServerOnline = true;
+                                powerButton.textContent = '關閉伺服器';
+                            } else {
+                                // log.textContent += '\n已取得伺服器狀態: 離線';
+                                isServerOnline = false;
+                                powerButton.textContent = '啟動伺服器';
+                            }
+
+                            document.getElementById('server_status').textContent = data.online ? "在線" : "離線";
+                            document.getElementById('server_status').style.color = data.online ? "green" : "red";
+                            document.getElementById('online_player').textContent = data.online_player + " / " + data.max_player;
+                            document.getElementById('player_list').textContent = data.player_list;
+
+
+                            return;
+                        }
+                    } catch (e) {
+                        console.e
+                    }
+                    log.scrollTo("bottom", 0);
+                };
+
+                ws.onerror = (err) => {
+                    log.textContent += '\n' + 'WebSocket 錯誤: ' + err;
+                    log.textContent += '\n伺服器可能不在線上，連線不到伺服器，或是沒有訪問權限';
+                }
+
+
+                ws.onclose = () => log.textContent += '\nWebSocket 已斷線';
+
+            }
+
+            function sendCommand(cmd) {
+                // log.textContent = '';
+                const msg = JSON.stringify({ cmd: cmd });
+                ws.send(msg);
+                log.textContent += '\n' + '送出指令: ' + cmd;
+            }
+
+            function toggleServer() {
+                if (isServerOnline) {
+                    sendCommand('stop');
+                } else {
+                    sendCommand('start');
+                }
+            }
+        </script>
+        <style>
+            main {
+                display: flex;
+                flex-direction: row;
+                align-items: top;
+                justify-content: left;
+            }
+
+            .status_elements {
+                margin-bottom: 10px;
+                background-color: #a0a0a0;
+                padding: 5px;
+                border-radius: 5px;
+            }
+
+            button.status_elements {
+                background-color: #a0a0a0;
+                color: black;
+                border: none;
+                padding: 10px 20px;
+                cursor: pointer;
+            }
+
+            button#power_button {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                cursor: pointer;
+
+            }
+
+            status {
+                display: flex;
+                flex-direction: column;
+                margin-right: 20px;
+                margin-left: 20px;
+                background-color: #f0f0f0;
+                padding: 25px;
+                border-radius: 5px;
+                min-width: 188.05px;
+                max-width: 188.05px;
+            }
+
+            log {
+                flex-grow: 1;
+                background-color: #f0f0f0;
+                padding: 25px;
+                border-radius: 5px;
+                max-height: 90vh;
+                height: 90vh;
+                overflow-y: auto;
+            }
+        </style>
+</body>
+
+</html>
